@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vape CMS Admin</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #ffffff;
+            color: #333333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .header {
+            background-color: #000000;
+            color: #ffffff;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border-radius: 8px;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .header h1 i {
+            margin-right: 0.5rem;
+        }
+
+        .subtitle {
+            color: #cccccc;
+            font-size: 0.9rem;
+        }
+
+        .status {
+            text-align: right;
+        }
+
+        .status .online {
+            color: #666666;
+            font-size: 0.9rem;
+        }
+
+        .status .indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background-color: #666666;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+
+        .nav {
+            background-color: #f8f8f8;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .nav-links a {
+            color: #333333;
+            text-decoration: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            background-color: #ffffff;
+            border: 1px solid #e0e0e0;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .nav-links a:hover {
+            background-color: #000000;
+            color: #ffffff;
+            border-color: #000000;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background-color: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 1.5rem;
+            transition: all 0.2s ease;
+        }
+
+        .stat-card:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .stat-content {
+            flex: 1;
+        }
+
+        .stat-title {
+            font-size: 0.9rem;
+            color: #666666;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 600;
+            color: #000000;
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            color: #ffffff;
+            background-color: #000000;
+        }
+
+        .recent-section {
+            background-color: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 2rem;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            color: #000000;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem 2rem;
+            color: #666666;
+        }
+
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        .empty-state h3 {
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+            color: #333333;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            border: 1px solid #e0e0e0;
+            background-color: #ffffff;
+            color: #333333;
+        }
+
+        .btn:hover {
+            background-color: #000000;
+            color: #ffffff;
+            border-color: #000000;
+        }
+
+        .btn-primary {
+            background-color: #000000;
+            color: #ffffff;
+            border-color: #000000;
+        }
+
+        .btn-primary:hover {
+            background-color: #ffffff;
+            color: #000000;
+        }
+
+        .product-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .product-item {
+            background-color: #f8f8f8;
+            border-radius: 8px;
+            padding: 1.5rem;
+            border-left: 3px solid #000000;
+            transition: all 0.2s ease;
+        }
+
+        .product-item:hover {
+            background-color: #ffffff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .product-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #000000;
+            margin-bottom: 0.25rem;
+        }
+
+        .product-price {
+            color: #666666;
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .product-category {
+            color: #999999;
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .view-all {
+            text-align: center;
+            margin-top: 2rem;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            .header-content {
+                flex-direction: column;
+                text-align: center;
+                gap: 1rem;
+            }
+
+            .header h1 {
+                font-size: 1.5rem;
+            }
+
+            .nav-links {
+                justify-content: center;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stat-header {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-content">
+                <div>
+                    <h1><i class="fas fa-tachometer-alt"></i> Dashboard</h1>
+                    <div class="subtitle">Vape CMS Admin Panel</div>
+                </div>
+                <div class="status">
+                    <div class="online">
+                        <span class="indicator"></span>
+                        System Online
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="nav">
+            <div class="nav-links">
+                <a href="/admin"><i class="fas fa-home"></i> Dashboard</a>
+                <a href="/admin/products"><i class="fas fa-box"></i> Products</a>
+                <a href="/admin/products/new"><i class="fas fa-plus"></i> Add Product</a>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-content">
+                        <div class="stat-title">Total Products</div>
+                        <div class="stat-value">{{ products|length }}</div>
+                    </div>
+                    <div class="stat-icon">
+                        <i class="fas fa-box"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-content">
+                        <div class="stat-title">System Status</div>
+                        <div class="stat-value" style="font-size: 1.2rem;">Online</div>
+                    </div>
+                    <div class="stat-icon">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="recent-section">
+            <div class="section-title">
+                <i class="fas fa-clock"></i> Recent Products
+            </div>
+
+            {% if products %}
+            <div class="product-list">
+                {% for product in products[:5] %}
+                <div class="product-item">
+                    <div class="product-name">{{ product.name }}</div>
+                    <div class="product-price">${{ "%.2f"|format(product.price) }}</div>
+                    {% if product.category %}
+                    <div class="product-category">
+                        <i class="fas fa-tag"></i> {{ product.category }}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+
+            {% if products|length > 5 %}
+            <div class="view-all">
+                <a href="/admin/products" class="btn btn-primary">
+                    <i class="fas fa-eye"></i> View All Products
+                </a>
+            </div>
+            {% endif %}
+
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-box-open"></i>
+                <h3>No products yet</h3>
+                <p>Start building your catalog by adding your first product</p>
+                <a href="/admin/products/new" class="btn btn-primary" style="margin-top: 1.5rem;">
+                    <i class="fas fa-plus"></i> Add Your First Product
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>
