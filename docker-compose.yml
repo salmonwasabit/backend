@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: vape-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: vape_cms
+      POSTGRES_USER: vape_user
+      POSTGRES_PASSWORD: vape_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - vape-network
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vape-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://vape_user:vape_password@postgres:5432/vape_cms
+      SECRET_KEY: your-secret-key-here-make-it-long-and-secure-change-this-in-production
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+    networks:
+      - vape-network
+    volumes:
+      - ./uploads:/app/uploads
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.rule=Host(`api.localhost`)"
+      - "traefik.http.services.backend.loadbalancer.server.port=8000"
+      - "traefik.http.routers.backend.service=backend"
+      - "traefik.http.routers.backend.entrypoints=web"
+
+  traefik:
+    image: traefik:v3.0
+    container_name: vape-traefik
+    restart: unless-stopped
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - vape-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.localhost`)"
+      - "traefik.http.services.traefik.loadbalancer.server.port=8080"
+      - "traefik.http.routers.traefik.service=traefik"
+      - "traefik.http.routers.traefik.entrypoints=web"
+
+volumes:
+  postgres_data:
+
+
+networks:
+  vape-network:
+    driver: bridge
