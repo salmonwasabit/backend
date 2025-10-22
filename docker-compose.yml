@@ -22,9 +22,8 @@ services:
       dockerfile: Dockerfile
     container_name: vape-backend
     restart: unless-stopped
-    environment:
-      DATABASE_URL: postgresql://vape_user:vape_password@postgres:5432/vape_cms
-      SECRET_KEY: your-secret-key-here-make-it-long-and-secure-change-this-in-production
+    env_file:
+      - .env
     ports:
       - "8000:8000"
     depends_on:
