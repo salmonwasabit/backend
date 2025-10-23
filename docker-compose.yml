@@ -72,7 +72,7 @@ services:
       - "traefik.http.routers.traefik.tls.certresolver=myresolver"
       - "traefik.http.services.traefik.loadbalancer.server.port=8080"
       - "traefik.http.routers.traefik.middlewares=traefik-auth"
-      - "traefik.http.middlewares.traefik-auth.basicauth.users=user:$2y$05$3YKkQ1MJgOsygM.g80CxeOtMQYgpnbPIMBSlcuYZEI565yJmPrKqi"
+      - "traefik.http.middlewares.traefik-auth.basicauth.users=user:$$2y$$05$$3YKkQ1MJgOsygM.g80CxeOtMQYgpnbPIMBSlcuYZEI565yJmPrKqi"
 
 volumes:
   postgres_data:
