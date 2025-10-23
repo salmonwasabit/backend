@@ -1,0 +1,40 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: vape-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: vape_cms
+      POSTGRES_USER: vape_user
+      POSTGRES_PASSWORD: vape_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - vape-network
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vape-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+    networks:
+      - vape-network
+    volumes:
+      - ./uploads:/app/uploads
+
+volumes:
+  postgres_data:
+
+
+networks:
+  vape-network:
+    external: true
