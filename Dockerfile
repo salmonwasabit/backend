@@ -15,6 +15,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app/ ./app/
 COPY templates/ ./templates/
 COPY static/ ./static/
+COPY init_admin.py ./
 
 # Create uploads directory
 RUN mkdir -p uploads
@@ -26,4 +27,4 @@ RUN mkdir -p templates static
 EXPOSE 8000
 
 # Run the application
-CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["sh", "-c", "python init_admin.py && python -m uvicorn app.main:app --host 0.0.0.0 --port 8000"]
