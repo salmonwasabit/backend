@@ -1,71 +1,62 @@
-from dotenv import load_dotenv
-from passlib.context import CryptContext
-from jose import JWTError, jwt
-from datetime import datetime, timedelta
-from typing import Optional
-from collections import defaultdict
-import time
-import secrets
-load_dotenv()
-from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Request, Form
-from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import create_engine, Column, Integer, String, Float, Text, DateTime, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session, relationship
-from sqlalchemy.sql import func
-from pydantic import BaseModel
-from dotenv import load_dotenv
-from typing import List, Optional
-import uvicorn
 import os
-from pathlib import Path
 import shutil
-from datetime import datetime
 import time
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import List, Optional
+
+import uvicorn
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.security import OAuth2PasswordBearer
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+from pydantic import BaseModel
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    create_engine,
+)
 from sqlalchemy.exc import OperationalError
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import Session, relationship, sessionmaker
+from sqlalchemy.sql import func
 
 # Database setup
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://vape_user:vape_password@localhost:5432/vape_cms")
+DATABASE_URL = os.getenv(
+    "DATABASE_URL", "postgresql://vape_user:vape_password@localhost:5432/vape_cms"
+)
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
-# Authentication configuration
-SECRET_KEY = os.getenv("SECRET_KEY", secrets.token_urlsafe(32))
+
+# Auth configuration
+SECRET_KEY = os.getenv(
+    "SECRET_KEY", "your-super-secure-secret-key-change-this-in-production"
+)
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
-from fastapi.security import OAuth2PasswordBearer
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
-# Rate limiting
-login_attempts = defaultdict(list)
-MAX_LOGIN_ATTEMPTS = 5
-LOGIN_WINDOW_SECONDS = 300  # 5 minutes
-
-def check_rate_limit(identifier: str) -> bool:
-    """Check if the identifier has exceeded rate limits"""
-    now = time.time()
-    attempts = login_attempts[identifier]
-    
-    # Remove old attempts outside the window
-    attempts[:] = [t for t in attempts if now - t < LOGIN_WINDOW_SECONDS]
-    
-    return len(attempts) < MAX_LOGIN_ATTEMPTS
-
-def record_login_attempt(identifier: str):
-    """Record a login attempt"""
-    now = time.time()
-    login_attempts[identifier].append(now)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
 
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
+
 def get_password_hash(password):
     return pwd_context.hash(password)
+
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
@@ -77,15 +68,6 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-def verify_token(token: str):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
-            return None
-        return username
-    except JWTError:
-        return None
 
 # Models
 class User(Base):
@@ -97,48 +79,61 @@ class User(Base):
     is_active = Column(Integer, default=1)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+
 class Product(Base):
     __tablename__ = "products"
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, unique=True, index=True)
     name = Column(String, nullable=False)
     description = Column(Text)
     price = Column(Float, nullable=False)
     category = Column(String)
+    image_url = Column(String(500))  # Add image_url field
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-# Pydantic models
-class UserCreate(BaseModel):
-    username: str
-    email: str
-    password: str
+    # Relationship with images
+    images = relationship(
+        "Image",
+        back_populates="product",
+        cascade="all, delete-orphan",
+        primaryjoin="and_(Product.id == foreign(Image.entity_id), Image.entity_type == 'products')",
+    )
 
-class UserLogin(BaseModel):
-    username: str
-    password: str
 
-class Token(BaseModel):
-    access_token: str
-    token_type: str
+class Image(Base):
+    __tablename__ = "images"
 
-class TokenData(BaseModel):
-    username: Optional[str] = None
+    id = Column(Integer, primary_key=True, index=True)
+    filename = Column(String(255), unique=True, index=True, nullable=False)
+    original_filename = Column(String(255), nullable=False)
+    file_path = Column(String(500), nullable=False)
+    thumbnail_path = Column(String(500))
+    file_size = Column(BigInteger, nullable=False)
+    mime_type = Column(String(100), nullable=False)
+    width = Column(Integer)
+    height = Column(Integer)
+    entity_type = Column(
+        String(50), nullable=False
+    )  # "products", "categories", "banners"
+    entity_id = Column(Integer, index=True)  # Link to product/category
+    alt_text = Column(String(255))  # For accessibility
+    is_active = Column(Boolean, default=True)
+    uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-class UserResponse(BaseModel):
-    id: int
-    username: str
-    email: str
-    is_active: int
-    created_at: datetime
+    # Relationships
+    uploader = relationship("User", backref="uploaded_images")
+    product = relationship(
+        "Product",
+        back_populates="images",
+        primaryjoin="and_(foreign(Image.entity_id) == Product.id, Image.entity_type == 'products')",
+    )
 
-    class Config:
-        from_attributes = True
 
 class Media(Base):
     __tablename__ = "media"
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, unique=True, index=True)
     filename = Column(String, nullable=False)
     original_filename = Column(String, nullable=False)
     mime_type = Column(String)
@@ -146,23 +141,24 @@ class Media(Base):
     url = Column(String)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+
 class ProductImage(Base):
     __tablename__ = "product_images"
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, unique=True, index=True)
     product_id = Column(Integer, ForeignKey("products.id"))
     media_id = Column(Integer, ForeignKey("media.id"))
     product = relationship("Product")
     media = relationship("Media")
 
+
 class Category(Base):
     __tablename__ = "categories"
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, unique=True, index=True)
     name = Column(String, nullable=False, unique=True)
     description = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
 
 # Create tables with retry (helps when the DB container isn't ready yet)
 def create_tables_with_retry(retries: int = 8, delay: float = 2.0):
@@ -178,7 +174,9 @@ def create_tables_with_retry(retries: int = 8, delay: float = 2.0):
                 raise
             time.sleep(delay)
 
-create_tables_with_retry()
+
+# create_tables_with_retry()
+
 
 # Pydantic models
 class ProductBase(BaseModel):
@@ -186,17 +184,22 @@ class ProductBase(BaseModel):
     description: Optional[str] = None
     price: float
     category: Optional[str] = None
+    image_url: Optional[str] = None
+
 
 class ProductCreate(ProductBase):
     pass
+
 
 class ProductResponse(ProductBase):
     id: int
     created_at: datetime
     updated_at: Optional[datetime]
+    images: List[dict] = []
 
     class Config:
         from_attributes = True
+
 
 class MediaBase(BaseModel):
     filename: str
@@ -205,18 +208,22 @@ class MediaBase(BaseModel):
     size: Optional[int]
     url: str
 
+
 class MediaCreate(BaseModel):
     filename: str
     original_filename: str
     mime_type: Optional[str]
     size: Optional[int]
 
+
 class CategoryBase(BaseModel):
     name: str
     description: Optional[str] = None
 
+
 class CategoryCreate(CategoryBase):
     pass
+
 
 class CategoryResponse(CategoryBase):
     id: int
@@ -226,45 +233,75 @@ class CategoryResponse(CategoryBase):
     class Config:
         from_attributes = True
 
+
+class UserBase(BaseModel):
+    username: str
+    email: str
+    is_active: int
+
+
+class UserCreate(BaseModel):
+    username: str
+    email: str
+    password: str
+
+
+class UserResponse(UserBase):
+    id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+
+class TokenData(BaseModel):
+    username: Optional[str] = None
+
+
 # FastAPI app
 app = FastAPI(title="Vape CMS API", version="1.0.0")
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
+
 
 # Test route - moved to right after app creation
 @app.get("/test123")
 def test123():
     return {"message": "Test123 working"}
 
+
+# Redirect /login to /admin/login for convenience
+@app.get("/login")
+def redirect_login():
+    return RedirectResponse(url="/admin/login", status_code=302)
+
+
 # CORS middleware
+cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify your frontend URL
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Security middleware
-app.add_middleware(
-    TrustedHostMiddleware,
-    allowed_hosts=["*"],  # In production, specify your domain
-)
-
-# Security headers
-@app.middleware("http")
-async def add_security_headers(request: Request, call_next):
-    response = await call_next(request)
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
-    response.headers["X-XSS-Protection"] = "1; mode=block"
-    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-    response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self';"
-    return response
-
 # Mount static files for uploads
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
+# Include routers
+from .routers import images
+
+app.include_router(images.router, prefix="/api/images", tags=["images"])
+
 # Templates
 templates = Jinja2Templates(directory="templates")
+
 
 # Dependency
 def get_db():
@@ -275,122 +312,92 @@ def get_db():
         db.close()
 
 
-# API Routes
-# Authentication routes
-@app.post("/api/auth/login", response_model=Token)
-async def login(user_credentials: UserLogin, db: Session = Depends(get_db)):
-
-    user = db.query(User).filter(User.username == user_credentials.username).first()
-
-    if not user or not verify_password(user_credentials.password, user.hashed_password):
-
-        raise HTTPException(
-
-            status_code=401,
-
-            detail="Incorrect username or password",
-
-            headers={"WWW-Authenticate": "Bearer"},
-
-        )
-
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-
-    access_token = create_access_token(
-
-        data={"sub": user.username}, expires_delta=access_token_expires
-
-    )
-
-    return {"access_token": access_token, "token_type": "bearer"}
-
-
-
-@app.post("/api/auth/register", response_model=UserResponse)
-
-async def register(user: UserCreate, db: Session = Depends(get_db)):
-
-    # Check if user already exists
-
-    db_user = db.query(User).filter(
-
-        (User.username == user.username) | (User.email == user.email)
-
-    ).first()
-
-    if db_user:
-
-        raise HTTPException(status_code=400, detail="Username or email already registered")
-
-    
-
-    # Hash password and create user
-
-    hashed_password = get_password_hash(user.password)
-
-    db_user = User(
-
-        username=user.username,
-
-        email=user.email,
-
-        hashed_password=hashed_password
-
-    )
-
-    db.add(db_user)
-
-    db.commit()
-
-    db.refresh(db_user)
-
-    return db_user
-
-
-
-async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-
-    credentials_exception = HTTPException(
-
-        status_code=401,
-
-        detail="Could not validate credentials",
-
-        headers={"WWW-Authenticate": "Bearer"},
-
-    )
-
-    username = verify_token(token)
-
-    if username is None:
-
-        raise credentials_exception
-
+# Auth functions
+def authenticate_user(db: Session, username: str, password: str):
     user = db.query(User).filter(User.username == username).first()
-
-    if user is None:
-
-        raise credentials_exception
-
+    if not user:
+        return False
+    if not verify_password(password, user.hashed_password):
+        return False
     return user
 
 
+def get_current_user(
+    token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
+):
+    credentials_exception = HTTPException(
+        status_code=401,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        token_data = TokenData(username=username)
+    except JWTError:
+        raise credentials_exception
+    user = db.query(User).filter(User.username == token_data.username).first()
+    if user is None:
+        raise credentials_exception
+    return user
+
+
+# Auth API Routes
+@app.post("/api/auth/login", response_model=Token)
+def login(credentials: dict, db: Session = Depends(get_db)):
+    user = authenticate_user(
+        db, credentials.get("username"), credentials.get("password")
+    )
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+
 
 @app.get("/api/auth/me", response_model=UserResponse)
-
-async def read_users_me(current_user: User = Depends(get_current_user)):
-
+def read_users_me(current_user: User = Depends(get_current_user)):
     return current_user
 
 
+# API Routes
 @app.get("/api/test2")
 def get_test2():
     return {"message": "Test2 working"}
 
+
 @app.get("/api/products", response_model=List[ProductResponse])
-def get_products(skip: int = 0, limit: int = 100,
-                 db: Session = Depends(get_db)):
+def get_products(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     products = db.query(Product).offset(skip).limit(limit).all()
+    # Add images to each product
+    for product in products:
+        product_images = (
+            db.query(Image)
+            .filter(
+                Image.entity_type == "products",
+                Image.entity_id == product.id,
+                Image.is_active == True,
+            )
+            .all()
+        )
+        product.images = [
+            {
+                "id": img.id,
+                "filename": img.filename,
+                "url": f"/api/images/products/{img.filename}",
+                "thumbnail_url": f"/api/images/products/thumb_{img.filename}",
+                "alt_text": img.alt_text,
+            }
+            for img in product_images
+        ]
     return products
 
 
@@ -408,12 +415,35 @@ def get_product(product_id: int, db: Session = Depends(get_db)):
     product = db.query(Product).filter(Product.id == product_id).first()
     if product is None:
         raise HTTPException(status_code=404, detail="Product not found")
+
+    # Add images to product
+    product_images = (
+        db.query(Image)
+        .filter(
+            Image.entity_type == "products",
+            Image.entity_id == product.id,
+            Image.is_active == True,
+        )
+        .all()
+    )
+    product.images = [
+        {
+            "id": img.id,
+            "filename": img.filename,
+            "url": f"/api/images/products/{img.filename}",
+            "thumbnail_url": f"/api/images/products/thumb_{img.filename}",
+            "alt_text": img.alt_text,
+        }
+        for img in product_images
+    ]
+
     return product
 
 
 @app.put("/api/products/{product_id}", response_model=ProductResponse)
-def update_product(product_id: int, product: ProductCreate,
-                   db: Session = Depends(get_db)):
+def update_product(
+    product_id: int, product: ProductCreate, db: Session = Depends(get_db)
+):
     db_product = db.query(Product).filter(Product.id == product_id).first()
     if db_product is None:
         raise HTTPException(status_code=404, detail="Product not found")
@@ -442,9 +472,11 @@ def delete_product(product_id: int, db: Session = Depends(get_db)):
 def test_endpoint():
     return {"message": "Test endpoint working"}
 
+
 @app.get("/api/simple")
 def simple_endpoint():
     return {"message": "Simple endpoint working"}
+
 
 @app.get("/api/categories", response_model=List[CategoryResponse])
 def get_categories(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
@@ -455,7 +487,9 @@ def get_categories(skip: int = 0, limit: int = 100, db: Session = Depends(get_db
 @app.post("/api/categories", response_model=CategoryResponse)
 def create_category(category: CategoryCreate, db: Session = Depends(get_db)):
     # Check if category name already exists
-    existing_category = db.query(Category).filter(Category.name == category.name).first()
+    existing_category = (
+        db.query(Category).filter(Category.name == category.name).first()
+    )
     if existing_category:
         raise HTTPException(status_code=400, detail="Category name already exists")
 
@@ -475,17 +509,19 @@ def get_category(category_id: int, db: Session = Depends(get_db)):
 
 
 @app.put("/api/categories/{category_id}", response_model=CategoryResponse)
-def update_category(category_id: int, category: CategoryCreate,
-                   db: Session = Depends(get_db)):
+def update_category(
+    category_id: int, category: CategoryCreate, db: Session = Depends(get_db)
+):
     db_category = db.query(Category).filter(Category.id == category_id).first()
     if db_category is None:
         raise HTTPException(status_code=404, detail="Category not found")
 
     # Check if the new name conflicts with another category
-    existing_category = db.query(Category).filter(
-        Category.name == category.name,
-        Category.id != category_id
-    ).first()
+    existing_category = (
+        db.query(Category)
+        .filter(Category.name == category.name, Category.id != category_id)
+        .first()
+    )
     if existing_category:
         raise HTTPException(status_code=400, detail="Category name already exists")
 
@@ -535,29 +571,56 @@ def graphql_placeholder_post():
 @app.get("/admin", response_class=HTMLResponse)
 def admin_dashboard(request: Request, db: Session = Depends(get_db)):
     products = db.query(Product).all()
-    return templates.TemplateResponse("admin.html", {
-        "request": request,
-        "products": products,
-        "products_count": len(products)
-    })
+    return templates.TemplateResponse(
+        "admin.html",
+        {"request": request, "products": products, "products_count": len(products)},
+    )
 
 
 @app.get("/admin/products", response_class=HTMLResponse)
-def admin_products(request: Request, db: Session = Depends(get_db)):
-    products = db.query(Product).all()
-    return templates.TemplateResponse("products.html", {
-        "request": request,
-        "products": products
-    })
+def admin_products(
+    request: Request, page: int = 1, per_page: int = 20, db: Session = Depends(get_db)
+):
+    # Ensure valid page and per_page values
+    page = max(1, page)
+    per_page = max(5, min(100, per_page))  # Between 5 and 100
+
+    # Get total count for pagination
+    total_products = db.query(Product).count()
+    total_pages = (total_products + per_page - 1) // per_page
+
+    # Ensure page doesn't exceed total pages
+    page = min(page, max(1, total_pages))
+
+    # Calculate offset
+    offset = (page - 1) * per_page
+
+    # Get paginated products
+    products = db.query(Product).offset(offset).limit(per_page).all()
+
+    return templates.TemplateResponse(
+        "products.html",
+        {
+            "request": request,
+            "products": products,
+            "page": page,
+            "per_page": per_page,
+            "total_products": total_products,
+            "total_pages": total_pages,
+            "has_prev": page > 1,
+            "has_next": page < total_pages,
+            "prev_page": page - 1,
+            "next_page": page + 1,
+        },
+    )
 
 
 @app.get("/admin/products/new", response_class=HTMLResponse)
 def admin_new_product(request: Request):
-    return templates.TemplateResponse("product_form.html", {
-        "request": request,
-        "product": None,
-        "action": "Create Product"
-    })
+    return templates.TemplateResponse(
+        "product_form.html",
+        {"request": request, "product": None, "action": "Create Product"},
+    )
 
 
 @app.post("/admin/products")
@@ -566,13 +629,10 @@ def create_product_admin(
     description: str = Form(""),
     price: float = Form(...),
     category: str = Form(""),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     db_product = Product(
-        name=name,
-        description=description,
-        price=price,
-        category=category
+        name=name, description=description, price=price, category=category
     )
     db.add(db_product)
     db.commit()
@@ -581,15 +641,16 @@ def create_product_admin(
 
 
 @app.get("/admin/products/{product_id}/edit", response_class=HTMLResponse)
-def admin_edit_product(product_id: int, request: Request, db: Session = Depends(get_db)):
+def admin_edit_product(
+    product_id: int, request: Request, db: Session = Depends(get_db)
+):
     product = db.query(Product).filter(Product.id == product_id).first()
     if product is None:
         raise HTTPException(status_code=404, detail="Product not found")
-    return templates.TemplateResponse("product_form.html", {
-        "request": request,
-        "product": product,
-        "action": "Update Product"
-    })
+    return templates.TemplateResponse(
+        "product_form.html",
+        {"request": request, "product": product, "action": "Update Product"},
+    )
 
 
 @app.post("/admin/products/{product_id}/edit")
@@ -599,7 +660,7 @@ def update_product_admin(
     description: str = Form(""),
     price: float = Form(...),
     category: str = Form(""),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     product = db.query(Product).filter(Product.id == product_id).first()
     if product is None:
@@ -629,6 +690,168 @@ def delete_product_admin(product_id: int, db: Session = Depends(get_db)):
 @app.get("/health")
 def health_check():
     return {"status": "healthy", "test": "added"}
+
+
+# Populate database with sample products and categories
+@app.post("/api/populate")
+def populate_database():
+    """Populate database with sample products and categories for demo"""
+    db = SessionLocal()
+    try:
+        # Clear existing data
+        db.query(Product).delete()
+        db.query(Category).delete()
+
+        # Sample categories
+        categories_data = [
+            Category(
+                name="บุหรี่ไฟฟ้าทิ้ง",
+                description="Starter Kit และ Cartridge หลากหลายรสชาติ เหมาะสำหรับผู้เริ่มต้น",
+            ),
+            Category(
+                name="ระบบพอต", description="Pod ระบบปิดพร้อมรสชาติพรีเมียมและการใช้งานที่สะดวก"
+            ),
+            Category(name="โมดส์", description="อุปกรณ์สูบไอระดับพรีเมียมพร้อมคุณสมบัติขั้นสูง"),
+            Category(name="น้ำยาสูบ", description="น้ำยาสูบไอหลากหลายรสชาติและความเข้มข้น"),
+            Category(name="อุปกรณ์เสริม", description="อุปกรณ์และอะไหล่สำหรับการสูบไอ"),
+            Category(name="ธีมเกม", description="สินค้าการสูบไอธีมเกมและตัวละครสุดพิเศษ"),
+            Category(name="อื่นๆ", description="สินค้าอื่นๆที่เกี่ยวข้องกับการสูบไอ"),
+        ]
+
+        # Add categories first
+        for category in categories_data:
+            db.add(category)
+
+        # Sample products
+        products_data = [
+            Product(
+                name="Esko Switch Starter Kit",
+                description="Starter Kit และ Cartridge หลากหลายรสชาติ",
+                price=79.99,
+                category="บุหรี่ไฟฟ้าทิ้ง",
+            ),
+            Product(
+                name="Esko Switch Strawberry Ice",
+                description="Cartridge รสสตรอเบอร์รี่เย็นฉ่ำ",
+                price=19.99,
+                category="บุหรี่ไฟฟ้าทิ้ง",
+            ),
+            Product(
+                name="Esko Switch Blue Razz",
+                description="Cartridge รสบลูราสเบอร์รี่",
+                price=19.99,
+                category="บุหรี่ไฟฟ้าทิ้ง",
+            ),
+            Product(
+                name="Pikka Pod System",
+                description="Pod ระบบปิดพร้อมรสชาติพรีเมียม",
+                price=59.99,
+                category="ระบบพอต",
+            ),
+            Product(
+                name="Pikka Pod Mint",
+                description="Pod รสมิ้นต์สดชื่น",
+                price=14.99,
+                category="ระบบพอต",
+            ),
+            Product(
+                name="Pikka Pod Berry Blast",
+                description="Pod รสเบอร์รี่รวม",
+                price=14.99,
+                category="ระบบพอต",
+            ),
+            Product(
+                name="Vortex Pro Device",
+                description="อุปกรณ์สูบไอระดับพรีเมียม",
+                price=129.99,
+                category="โมดส์",
+            ),
+            Product(
+                name="Vortex Pro Tank",
+                description="ถังสำหรับ Vortex Pro",
+                price=39.99,
+                category="โมดส์",
+            ),
+            Product(
+                name="Game Theme Pod",
+                description="Pod ธีมเกมสุดพิเศษ",
+                price=49.99,
+                category="ธีมเกม",
+            ),
+            Product(
+                name="Premium Cleaning Kit",
+                description="ชุดทำความสะอาดอุปกรณ์สูบไอ",
+                price=15.99,
+                category="อุปกรณ์เสริม",
+            ),
+        ]
+
+        for product in products_data:
+            db.add(product)
+
+        db.commit()
+
+        total_products = len(products_data)
+        total_categories = len(categories_data)
+        return {
+            "message": f"Database populated with {total_categories} categories and {total_products} products",
+            "categories_count": total_categories,
+            "products_count": total_products,
+        }
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500, detail=f"Failed to populate database: {str(e)}"
+        )
+    finally:
+        db.close()
+
+
+@app.post("/api/populate-categories")
+def populate_categories():
+    """Populate database with sample categories only"""
+    db = SessionLocal()
+    try:
+        # Clear existing categories
+        db.query(Category).delete()
+
+        # Sample categories
+        categories_data = [
+            Category(
+                name="บุหรี่ไฟฟ้าทิ้ง",
+                description="Starter Kit และ Cartridge หลากหลายรสชาติ เหมาะสำหรับผู้เริ่มต้น",
+            ),
+            Category(
+                name="ระบบพอต", description="Pod ระบบปิดพร้อมรสชาติพรีเมียมและการใช้งานที่สะดวก"
+            ),
+            Category(name="โมดส์", description="อุปกรณ์สูบไอระดับพรีเมียมพร้อมคุณสมบัติขั้นสูง"),
+            Category(name="น้ำยาสูบ", description="น้ำยาสูบไอหลากหลายรสชาติและความเข้มข้น"),
+            Category(name="อุปกรณ์เสริม", description="อุปกรณ์และอะไหล่สำหรับการสูบไอ"),
+            Category(name="ธีมเกม", description="สินค้าการสูบไอธีมเกมและตัวละครสุดพิเศษ"),
+            Category(name="อื่นๆ", description="สินค้าอื่นๆที่เกี่ยวข้องกับการสูบไอ"),
+        ]
+
+        # Add categories
+        for category in categories_data:
+            db.add(category)
+
+        db.commit()
+
+        total_categories = len(categories_data)
+        return {
+            "message": f"Database populated with {total_categories} categories",
+            "categories_count": total_categories,
+        }
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500, detail=f"Failed to populate categories: {str(e)}"
+        )
+    finally:
+        db.close()
+
 
 @app.get("/test-end")
 def test_end():
