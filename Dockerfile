@@ -10,20 +10,20 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install Python dependencies
-COPY requirements.txt .
+COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Install psycopg2-binary for database connectivity check
 RUN pip install --no-cache-dir psycopg2-binary
 
 # Copy application code
-COPY app/ ./app/
-COPY templates/ ./templates/
-COPY static/ ./static/
-COPY init_admin.py ./
-COPY populate_products.py ./
-COPY populate_categories.py ./
-COPY entrypoint.sh ./
+COPY backend/app/ ./app/
+COPY backend/templates/ ./templates/
+COPY backend/static/ ./static/
+COPY backend/init_admin.py ./
+COPY backend/populate_products.py ./
+COPY backend/populate_categories.py ./
+COPY backend/entrypoint.sh ./
 
 # Copy brand images from frontend public directory
 COPY frontend/public/brands ./static/brands
