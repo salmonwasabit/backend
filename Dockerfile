@@ -25,6 +25,9 @@ COPY populate_products.py ./
 COPY populate_categories.py ./
 COPY entrypoint.sh ./
 
+# Copy brand images from frontend public directory
+COPY frontend/public/brands ./static/brands
+
 # Make entrypoint script executable
 RUN chmod +x entrypoint.sh
 

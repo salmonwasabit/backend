@@ -28,7 +28,7 @@ def populate_products():
                 "description": "Starter Kit และ Cartridge หลากหลายรสชาติ - ชุดเริ่มต้นสูบไอพร้อม cartridge แทนที่ได้",
                 "price": 79.99,
                 "category": "Starter Kit",
-                "image_url": "/brands/esko/esko-switch-starter-kit.jpg",
+                "image_url": "/static/brands/esko/esko-switch-starter-kit.jpg",
             },
             {
                 "name": "Esko Switch Apple Aloe",
@@ -148,7 +148,7 @@ def populate_products():
                 "description": "Pod ระบบปิดพร้อมรสชาติพรีเมียม - อุปกรณ์พกพาสะดวก",
                 "price": 59.99,
                 "category": "Pod",
-                "image_url": "/brands/pikka/system.png",
+                "image_url": "/static/brands/pikka/system.png",
             },
             {
                 "name": "Pikka Pod Apple Aloe",
@@ -310,7 +310,7 @@ def populate_products():
                 "description": "อุปกรณ์สูบไอระดับพรีเมียม Vortex Pro - ประสิทธิภาพสูงและทนทาน",
                 "price": 89.99,
                 "category": "Device",
-                "image_url": "/brands/vortex/vortex-pro-device.jpg",
+                "image_url": "/static/brands/vortex/vortex-pro-device.jpg",
             },
             {
                 "name": "Vortex Pro Starter Kit Complete",

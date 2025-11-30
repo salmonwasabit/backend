@@ -186,6 +186,7 @@
             <thead>
                 <tr>
                     <th>ID</th>
+                    <th>Image</th>
                     <th>Name</th>
                     <th>Price</th>
                     <th>Category</th>
@@ -196,6 +197,15 @@
                 {% for product in products %}
                 <tr>
                     <td>{{ product.id }}</td>
+                    <td>
+                        {% if product.image_url %}
+                        <img src="{{ product.image_url }}" alt="{{ product.name }}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid #ddd;">
+                        {% else %}
+                        <div style="width: 60px; height: 60px; background-color: #f0f0f0; border-radius: 4px; border: 1px solid #ddd; display: flex; align-items: center; justify-content: center; color: #999; font-size: 10px;">
+                            No Image
+                        </div>
+                        {% endif %}
+                    </td>
                     <td>{{ product.name }}</td>
                     <td>${{ "%.2f"|format(product.price) }}</td>
                     <td>{{ product.category or 'N/A' }}</td>
